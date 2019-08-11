@@ -542,6 +542,7 @@ OLAPStatus OLAPEngine::get_all_root_path_info(vector<RootPathInfo>* root_paths_i
             // if this path is not used, init it's info
             if (!path_map[path].is_used) {
                 path_map[path].capacity = 1;
+                path_map[path].disk_total_capacity = 1;
                 path_map[path].data_used_capacity = 0;
                 path_map[path].available = 0;
                 path_map[path].storage_medium = TStorageMedium::HDD;
@@ -581,6 +582,13 @@ OLAPStatus OLAPEngine::get_all_root_path_info(vector<RootPathInfo>* root_paths_i
             _get_path_available_capacity(info.path,  &info.available);
         }
     }
+    for (auto& info: *root_paths_info) {
+        if (info.is_used) {
+            _get_path_disk_total_capacity(info.path,  &info.disk_total_capacity);
+        }
+    }
+
+
     timer.stop();
     LOG(INFO) << "get root path info cost: " << timer.elapsed_time() / 1000000
             << " ms. tablet counter: " << tablet_counter;
@@ -746,6 +754,23 @@ OLAPStatus OLAPEngine::_get_path_available_capacity(
         boost::filesystem::path path_name(root_path);
         boost::filesystem::space_info path_info = boost::filesystem::space(path_name);
         *disk_available = path_info.available;
+    } catch (boost::filesystem::filesystem_error& e) {
+        LOG(WARNING) << "get space info failed. path: " << root_path << " erro:" << e.what();
+        return OLAP_ERR_STL_ERROR;
+    }
+
+    return res;
+}
+
+OLAPStatus OLAPEngine::_get_path_disk_total_capacity(
+        const string& root_path,
+        int64_t* disk_total_capacity) {
+    OLAPStatus res = OLAP_SUCCESS;
+
+    try {
+        boost::filesystem::path path_name(root_path);
+        boost::filesystem::space_info path_info = boost::filesystem::space(path_name);
+        *disk_total_capacity = path_info.capacity;
     } catch (boost::filesystem::filesystem_error& e) {
         LOG(WARNING) << "get space info failed. path: " << root_path << " erro:" << e.what();
         return OLAP_ERR_STL_ERROR;
